@@ -1,8 +1,33 @@
 interface Env {
   DB: D1Database;
+  GOOGLE_CLIENT_ID: string;
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+interface TokenInfo {
+  sub: string;
+  aud: string;
+  exp: string;
+  email: string;
+}
+
+async function verifyGoogleToken(token: string, clientId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
+    if (!res.ok) return null;
+    const data = await res.json() as TokenInfo;
+    if (data.aud !== clientId) return null;
+    if (Number(data.exp) * 1000 < Date.now()) return null;
+    return data.sub;
+  } catch {
+    return null;
+  }
+}
+
+function extractBearer(request: Request): string | null {
+  const auth = request.headers.get('Authorization') ?? '';
+  if (!auth.startsWith('Bearer ')) return null;
+  return auth.slice(7).trim() || null;
+}
 
 function cors(res: Response): Response {
   res.headers.set('Access-Control-Allow-Origin', '*');
@@ -15,19 +40,22 @@ export const onRequestOptions: PagesFunction = () =>
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     },
   }));
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (!env.DB) return cors(new Response(null, { status: 503 }));
 
-  const userId = new URL(request.url).searchParams.get('user_id') ?? '';
-  if (!UUID_RE.test(userId)) return cors(new Response('Invalid user_id', { status: 400 }));
+  const token = extractBearer(request);
+  if (!token) return cors(new Response('Unauthorized', { status: 401 }));
+
+  const sub = await verifyGoogleToken(token, env.GOOGLE_CLIENT_ID);
+  if (!sub) return cors(new Response('Unauthorized', { status: 401 }));
 
   const row = await env.DB
     .prepare('SELECT settings FROM user_settings WHERE user_id = ?')
-    .bind(userId)
+    .bind(sub)
     .first<{ settings: string }>();
 
   if (!row) return cors(new Response(null, { status: 404 }));
@@ -37,13 +65,16 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!env.DB) return cors(new Response(null, { status: 503 }));
 
-  let body: { user_id?: string; settings?: unknown };
+  const token = extractBearer(request);
+  if (!token) return cors(new Response('Unauthorized', { status: 401 }));
+
+  const sub = await verifyGoogleToken(token, env.GOOGLE_CLIENT_ID);
+  if (!sub) return cors(new Response('Unauthorized', { status: 401 }));
+
+  let body: { settings?: unknown };
   try { body = await request.json(); } catch { return cors(new Response('Bad JSON', { status: 400 })); }
 
-  const { user_id, settings } = body;
-  if (!user_id || !UUID_RE.test(user_id) || !settings) {
-    return cors(new Response('Invalid body', { status: 400 }));
-  }
+  if (!body.settings) return cors(new Response('Invalid body', { status: 400 }));
 
   await env.DB
     .prepare(`
@@ -53,7 +84,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         settings   = excluded.settings,
         updated_at = excluded.updated_at
     `)
-    .bind(user_id, JSON.stringify(settings))
+    .bind(sub, JSON.stringify(body.settings))
     .run();
 
   return cors(Response.json({ ok: true }));

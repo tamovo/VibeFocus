@@ -1,15 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocalStorage } from './useLocalStorage';
+import { useAuth } from '../contexts/AuthContext';
 import type { AppState, CharacterCustomization } from '../types';
 import { CAFE_ITEMS } from '../data/cafeItems';
-
-const USER_ID_KEY = 'vibefocus_user_id';
-
-function getOrCreateUserId(): string {
-  let id = localStorage.getItem(USER_ID_KEY);
-  if (!id) { id = crypto.randomUUID(); localStorage.setItem(USER_ID_KEY, id); }
-  return id;
-}
 
 export type SyncStatus = 'idle' | 'loading' | 'saving' | 'saved' | 'error';
 export type SyncTarget = 'unknown' | 'local' | 'cloud';
@@ -36,9 +29,9 @@ const DEFAULT_STATE: AppState = {
 };
 
 export function useAppState() {
+  const { user } = useAuth();
   const [rawState, setState] = useLocalStorage<AppState>('vibefocus_state', DEFAULT_STATE);
 
-  // Merge with defaults so newly added fields don't crash on existing stored states
   const state: AppState = {
     ...DEFAULT_STATE,
     ...rawState,
@@ -48,16 +41,27 @@ export function useAppState() {
     },
   };
 
-  const userId = useRef(getOrCreateUserId());
+  const tokenRef = useRef<string | undefined>(user?.idToken);
   const skipNextSave = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [syncTarget, setSyncTarget] = useState<SyncTarget>('unknown');
 
-  // Load from D1 on mount
   useEffect(() => {
+    tokenRef.current = user?.idToken;
+  }, [user?.idToken]);
+
+  // Load from D1 when user signs in
+  useEffect(() => {
+    if (!user) {
+      setSyncTarget('local');
+      setSyncStatus('idle');
+      return;
+    }
     setSyncStatus('loading');
-    fetch(`/api/settings?user_id=${userId.current}`)
+    fetch('/api/settings', {
+      headers: { 'Authorization': `Bearer ${user.idToken}` },
+    })
       .then(r => {
         if (r.status === 503) { setSyncTarget('local'); setSyncStatus('idle'); return null; }
         setSyncTarget('cloud');
@@ -79,18 +83,24 @@ export function useAppState() {
       })
       .catch(() => { setSyncTarget('local'); setSyncStatus('idle'); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user?.sub]);
 
-  // Save to D1 (debounced 2s, skips the setState triggered by the load above)
+  // Save to D1 (debounced 2s)
   useEffect(() => {
     if (skipNextSave.current) { skipNextSave.current = false; return; }
+    if (!tokenRef.current) return;
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
+      const token = tokenRef.current;
+      if (!token) return;
       setSyncStatus('saving');
       fetch('/api/settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId.current, settings: rawState }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ settings: rawState }),
       })
         .then(r => {
           if (r.status === 503) { setSyncTarget('local'); setSyncStatus('idle'); return; }
@@ -108,11 +118,7 @@ export function useAppState() {
   }, [rawState]);
 
   const addXP = (amount: number) => {
-    setState(prev => ({
-      ...prev,
-      xp: prev.xp + amount,
-      totalXp: prev.totalXp + amount,
-    }));
+    setState(prev => ({ ...prev, xp: prev.xp + amount, totalXp: prev.totalXp + amount }));
   };
 
   const spendXP = (amount: number): boolean => {
@@ -136,18 +142,14 @@ export function useAppState() {
   const unlockPlant = (plantId: string) => {
     setState(prev => ({
       ...prev,
-      unlockedPlants: prev.unlockedPlants.includes(plantId)
-        ? prev.unlockedPlants
-        : [...prev.unlockedPlants, plantId],
+      unlockedPlants: prev.unlockedPlants.includes(plantId) ? prev.unlockedPlants : [...prev.unlockedPlants, plantId],
     }));
   };
 
   const unlockCafeItem = (itemId: string) => {
     setState(prev => ({
       ...prev,
-      unlockedCafeItems: prev.unlockedCafeItems.includes(itemId)
-        ? prev.unlockedCafeItems
-        : [...prev.unlockedCafeItems, itemId],
+      unlockedCafeItems: prev.unlockedCafeItems.includes(itemId) ? prev.unlockedCafeItems : [...prev.unlockedCafeItems, itemId],
     }));
   };
 
@@ -175,10 +177,7 @@ export function useAppState() {
   };
 
   const addSession = (session: AppState['sessionHistory'][0]) => {
-    setState(prev => ({
-      ...prev,
-      sessionHistory: [session, ...prev.sessionHistory].slice(0, 50),
-    }));
+    setState(prev => ({ ...prev, sessionHistory: [session, ...prev.sessionHistory].slice(0, 50) }));
   };
 
   const setTrackIndex = (index: number) => {
@@ -190,18 +189,11 @@ export function useAppState() {
   };
 
   const setCharacterCustomization = (mode: AppState['mode'], customization: CharacterCustomization) => {
-    setState(prev => ({
-      ...prev,
-      characterCustomization: { ...prev.characterCustomization, [mode]: customization },
-    }));
+    setState(prev => ({ ...prev, characterCustomization: { ...prev.characterCustomization, [mode]: customization } }));
   };
 
-  // Get all cafe items merged with unlock state
   const getCafeItems = () => {
-    return CAFE_ITEMS.map(item => ({
-      ...item,
-      unlocked: state.unlockedCafeItems.includes(item.id),
-    }));
+    return CAFE_ITEMS.map(item => ({ ...item, unlocked: state.unlockedCafeItems.includes(item.id) }));
   };
 
   return {
@@ -223,6 +215,5 @@ export function useAppState() {
     setCharacterCustomization,
     syncStatus,
     syncTarget,
-    userId: userId.current,
   };
 }

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useAppState } from './hooks/useAppState';
+import { useAuth } from './contexts/AuthContext';
 import ModeToggle from './components/ModeToggle';
 import XPBar from './components/XPBar';
 import Avatar from './components/ArtAvatar';
@@ -13,6 +14,7 @@ import CharacterCustomizer from './components/CharacterCustomizer';
 import type { SessionHistory } from './types';
 
 export default function App() {
+  const { user, logout } = useAuth();
   const {
     state,
     addXP,
@@ -167,6 +169,28 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* User avatar + logout */}
+              {user && (
+                <button
+                  onClick={logout}
+                  title={`Signed in as ${user.email} — click to sign out`}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-full transition-all hover:opacity-75"
+                  style={{
+                    background: `${accentColor}15`,
+                    border: `1px solid ${accentColor}30`,
+                  }}
+                >
+                  <img
+                    src={user.picture}
+                    alt={user.name}
+                    className="w-6 h-6 rounded-full"
+                    referrerPolicy="no-referrer"
+                  />
+                  <span className="text-xs font-semibold hidden sm:inline" style={{ color: accentColor, fontFamily: 'Quicksand, sans-serif' }}>
+                    {user.name.split(' ')[0]}
+                  </span>
+                </button>
+              )}
               {/* Sync indicator — always visible */}
               <span
                 className="text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1"
