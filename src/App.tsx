@@ -23,6 +23,8 @@ export default function App() {
     unlockPlant,
     unlockCafeItem,
     addCustomPlant,
+    removeCustomPlant,
+    renameCustomPlant,
     addSession,
     setTrackIndex,
     setVolume,
@@ -358,6 +360,8 @@ export default function App() {
                       onUnlockPlant={unlockPlant}
                       onSpendXP={handleSpendXP}
                       onAddCustomPlant={addCustomPlant}
+                      onRemoveCustomPlant={removeCustomPlant}
+                      onRenameCustomPlant={renameCustomPlant}
                     />
                   </div>
                 ) : (
@@ -476,6 +480,8 @@ export default function App() {
                     onUnlockPlant={unlockPlant}
                     onSpendXP={handleSpendXP}
                     onAddCustomPlant={addCustomPlant}
+                    onRemoveCustomPlant={removeCustomPlant}
+                    onRenameCustomPlant={renameCustomPlant}
                   />
                 ) : (
                   <CafeShop

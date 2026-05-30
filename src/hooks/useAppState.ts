@@ -155,6 +155,21 @@ export function useAppState() {
     }));
   };
 
+  const removeCustomPlant = (plantId: string) => {
+    setState(prev => ({
+      ...prev,
+      customPlants: prev.customPlants.filter(p => p.id !== plantId),
+      unlockedPlants: prev.unlockedPlants.filter(id => id !== plantId),
+    }));
+  };
+
+  const renameCustomPlant = (plantId: string, name: string) => {
+    setState(prev => ({
+      ...prev,
+      customPlants: prev.customPlants.map(p => p.id === plantId ? { ...p, name } : p),
+    }));
+  };
+
   const addSession = (session: AppState['sessionHistory'][0]) => {
     setState(prev => ({
       ...prev,
@@ -195,6 +210,8 @@ export function useAppState() {
     unlockPlant,
     unlockCafeItem,
     addCustomPlant,
+    removeCustomPlant,
+    renameCustomPlant,
     addSession,
     setTrackIndex,
     setVolume,

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { PLANTS, getRandomUnlockedPlant } from '../data/plants';
 import type { Plant, AppMode } from '../types';
 
@@ -10,6 +10,8 @@ interface PlantShelfProps {
   onUnlockPlant: (plantId: string) => void;
   onSpendXP: (amount: number) => boolean;
   onAddCustomPlant: (plant: Plant) => void;
+  onRemoveCustomPlant: (plantId: string) => void;
+  onRenameCustomPlant: (plantId: string, name: string) => void;
 }
 
 const GACHA_COST = 500;
@@ -22,6 +24,8 @@ export default function PlantShelf({
   onUnlockPlant,
   onSpendXP,
   onAddCustomPlant,
+  onRemoveCustomPlant,
+  onRenameCustomPlant,
 }: PlantShelfProps) {
   const [showGacha, setShowGacha] = useState(false);
   const [gachaResult, setGachaResult] = useState<Plant | null>(null);
@@ -30,7 +34,14 @@ export default function PlantShelf({
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [uploadName, setUploadName] = useState('');
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingId) editInputRef.current?.focus();
+  }, [editingId]);
 
   const allPlants = [...PLANTS, ...customPlants];
   const unlockedPlants = allPlants.filter(p => unlockedPlantIds.includes(p.id));
@@ -362,30 +373,72 @@ export default function PlantShelf({
             </div>
           )}
 
-          {/* Custom plants grid */}
+          {/* Custom plants list with edit/delete */}
           {customPlants.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold mb-2 opacity-60" style={{ fontFamily: 'Quicksand' }}>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold opacity-60" style={{ fontFamily: 'Quicksand' }}>
                 My Designs ({customPlants.length})
               </p>
-              <div className="grid grid-cols-4 gap-2">
-                {customPlants.map(p => (
-                  <div
-                    key={p.id}
-                    className="rounded-2xl p-2 text-center"
-                    style={{ background: 'rgba(244,167,195,0.1)', border: '1px solid rgba(244,167,195,0.3)' }}
-                  >
-                    <img
-                      src={p.customImageUrl}
-                      alt={p.name}
-                      className="w-8 h-8 object-contain mx-auto rounded-lg"
-                    />
-                    <p className="text-xs mt-1 font-semibold truncate" style={{ color: '#F4A7C3', fontSize: '9px' }}>
-                      {p.name}
-                    </p>
+              {customPlants.map(p => (
+                <div
+                  key={p.id}
+                  className="flex items-center gap-3 px-3 py-2 rounded-2xl"
+                  style={{ background: 'rgba(244,167,195,0.1)', border: '1px solid rgba(244,167,195,0.3)' }}
+                >
+                  <img
+                    src={p.customImageUrl}
+                    alt={p.name}
+                    className="w-10 h-10 object-contain rounded-xl flex-shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    {editingId === p.id ? (
+                      <input
+                        ref={editInputRef}
+                        value={editingName}
+                        onChange={e => setEditingName(e.target.value)}
+                        onBlur={() => {
+                          if (editingName.trim()) onRenameCustomPlant(p.id, editingName.trim());
+                          setEditingId(null);
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            if (editingName.trim()) onRenameCustomPlant(p.id, editingName.trim());
+                            setEditingId(null);
+                          }
+                          if (e.key === 'Escape') setEditingId(null);
+                        }}
+                        className="w-full px-2 py-1 rounded-lg text-xs outline-none"
+                        style={{
+                          background: 'rgba(255,255,255,0.8)',
+                          border: `1px solid ${accentColor}50`,
+                          color: '#6B5B8A',
+                          fontFamily: 'Nunito',
+                        }}
+                      />
+                    ) : (
+                      <p className="text-xs font-semibold truncate" style={{ color: '#C9A7F4', fontFamily: 'Quicksand' }}>
+                        {p.name}
+                      </p>
+                    )}
                   </div>
-                ))}
-              </div>
+                  <button
+                    onClick={() => { setEditingId(p.id); setEditingName(p.name); }}
+                    className="text-xs px-2 py-1 rounded-lg smooth-transition hover:opacity-80"
+                    style={{ background: `${accentColor}20`, color: accentColor }}
+                    title="Rename"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => onRemoveCustomPlant(p.id)}
+                    className="text-xs px-2 py-1 rounded-lg smooth-transition hover:opacity-80"
+                    style={{ background: 'rgba(244,100,100,0.1)', color: '#E05555' }}
+                    title="Delete"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </div>
