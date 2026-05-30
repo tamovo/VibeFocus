@@ -12,6 +12,7 @@ function getOrCreateUserId(): string {
 }
 
 export type SyncStatus = 'idle' | 'loading' | 'saving' | 'saved' | 'error';
+export type SyncTarget = 'unknown' | 'local' | 'cloud';
 
 const DEFAULT_STATE: AppState = {
   mode: 'art',
@@ -51,13 +52,15 @@ export function useAppState() {
   const skipNextSave = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
+  const [syncTarget, setSyncTarget] = useState<SyncTarget>('unknown');
 
   // Load from D1 on mount
   useEffect(() => {
     setSyncStatus('loading');
     fetch(`/api/settings?user_id=${userId.current}`)
       .then(r => {
-        if (r.status === 503) { setSyncStatus('idle'); return null; } // D1 not bound — silent
+        if (r.status === 503) { setSyncTarget('local'); setSyncStatus('idle'); return null; }
+        setSyncTarget('cloud');
         return r.ok ? r.json() : null;
       })
       .then((data: { settings: AppState } | null) => {
@@ -74,7 +77,7 @@ export function useAppState() {
         }
         setSyncStatus('idle');
       })
-      .catch(() => setSyncStatus('idle'));
+      .catch(() => { setSyncTarget('local'); setSyncStatus('idle'); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -90,8 +93,9 @@ export function useAppState() {
         body: JSON.stringify({ user_id: userId.current, settings: rawState }),
       })
         .then(r => {
-          if (r.status === 503) { setSyncStatus('idle'); return; } // D1 not bound — silent
+          if (r.status === 503) { setSyncTarget('local'); setSyncStatus('idle'); return; }
           if (r.ok) {
+            setSyncTarget('cloud');
             setSyncStatus('saved');
             setTimeout(() => setSyncStatus('idle'), 3000);
           } else {
@@ -218,6 +222,7 @@ export function useAppState() {
     getCafeItems,
     setCharacterCustomization,
     syncStatus,
+    syncTarget,
     userId: userId.current,
   };
 }

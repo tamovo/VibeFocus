@@ -31,6 +31,7 @@ export default function App() {
     getCafeItems,
     setCharacterCustomization,
     syncStatus,
+    syncTarget,
   } = useAppState();
 
   const [activePanel, setActivePanel] = useState<'main' | 'shop' | 'history'>('main');
@@ -173,23 +174,27 @@ export default function App() {
                   background:
                     syncStatus === 'error' ? '#FFE0E0'
                     : syncStatus === 'saved' ? '#E0FFE8'
-                    : syncStatus === 'idle' ? 'rgba(0,0,0,0.05)'
-                    : `${accentColor}18`,
+                    : syncTarget === 'local' ? 'rgba(0,0,0,0.06)'
+                    : syncTarget === 'cloud' ? `${accentColor}18`
+                    : 'rgba(0,0,0,0.05)',
                   color:
                     syncStatus === 'error' ? '#C0392B'
                     : syncStatus === 'saved' ? '#1E8449'
-                    : syncStatus === 'idle' ? 'rgba(0,0,0,0.3)'
-                    : accentColor,
+                    : syncTarget === 'local' ? 'rgba(0,0,0,0.35)'
+                    : syncTarget === 'cloud' ? accentColor
+                    : 'rgba(0,0,0,0.25)',
                   fontFamily: 'Quicksand, sans-serif',
                   transition: 'all 0.3s ease',
                 }}
               >
                 {syncStatus === 'loading' && <span className="animate-spin inline-block">↻</span>}
-                {syncStatus === 'loading' ? ' Syncing…'
-                  : syncStatus === 'saving' ? '↑ Saving…'
-                  : syncStatus === 'saved' ? '✓ Saved'
-                  : syncStatus === 'error' ? '⚠ Sync error'
-                  : '☁ Cloud'}
+                {syncStatus === 'loading' ? ' Connecting…'
+                  : syncStatus === 'saving' ? '☁ Saving to database…'
+                  : syncStatus === 'saved' ? '✓ Saved to database'
+                  : syncStatus === 'error' ? '⚠ Failed to save'
+                  : syncTarget === 'cloud' ? '☁ Database'
+                  : syncTarget === 'local' ? '💾 Browser only'
+                  : '💾 Browser'}
               </span>
               {/* XP Badge */}
               <div
