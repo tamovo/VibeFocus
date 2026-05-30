@@ -169,12 +169,10 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-2">
-              {/* User avatar + logout */}
+              {/* User avatar (display only) */}
               {user && (
-                <button
-                  onClick={logout}
-                  title={`Signed in as ${user.email} — click to sign out`}
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-full transition-all hover:opacity-75"
+                <div
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-full"
                   style={{
                     background: `${accentColor}15`,
                     border: `1px solid ${accentColor}30`,
@@ -189,6 +187,23 @@ export default function App() {
                   <span className="text-xs font-semibold hidden sm:inline" style={{ color: accentColor, fontFamily: 'Quicksand, sans-serif' }}>
                     {user.name.split(' ')[0]}
                   </span>
+                </div>
+              )}
+              {/* Sign out button */}
+              {user && (
+                <button
+                  onClick={logout}
+                  title="Sign out"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-all hover:opacity-80 active:scale-95"
+                  style={{
+                    background: 'rgba(200,80,80,0.1)',
+                    border: '1px solid rgba(200,80,80,0.25)',
+                    color: '#C05050',
+                    fontFamily: 'Quicksand, sans-serif',
+                  }}
+                >
+                  <span>↪</span>
+                  <span className="hidden sm:inline">Sign out</span>
                 </button>
               )}
               {/* Sync indicator — always visible */}
