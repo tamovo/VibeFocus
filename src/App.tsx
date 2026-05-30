@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAppState } from './hooks/useAppState';
 import { useAuth } from './contexts/AuthContext';
 import ModeToggle from './components/ModeToggle';
@@ -565,38 +565,79 @@ export default function App() {
   );
 }
 
-// Motivational quotes component
+// Module-level set persists across re-renders — tracks seen quote IDs to avoid repeats
+const seenQuoteIds = new Set<number>();
+
 function MotivationalQuote({ mode }: { mode: 'art' | 'job' }) {
-  const artQuotes = [
-    { text: "Every expert was once a beginner. Keep drawing! ✏️", author: "— Unknown" },
-    { text: "Creativity takes courage. One stroke at a time! 🎨", author: "— Henri Matisse" },
-    { text: "You don't have to be great to start, but you have to start to be great.", author: "— Zig Ziglar" },
-    { text: "Art enables us to find ourselves and lose ourselves at the same time.", author: "— Thomas Merton" },
-    { text: "The secret to getting ahead is getting started. Pick up the pencil! ✨", author: "— Mark Twain" },
-  ];
-
-  const jobQuotes = [
-    { text: "Every rejection is redirection. Your dream job is out there! 💪", author: "— Unknown" },
-    { text: "Success is not final, failure is not fatal: it is the courage to continue.", author: "— Winston Churchill" },
-    { text: "The best time to plant a tree was 20 years ago. The second best time is now.", author: "— Chinese Proverb" },
-    { text: "Opportunities don't happen. You create them. Keep applying! 🚀", author: "— Chris Grosser" },
-    { text: "A smooth sea never made a skilled sailor. You've got this! ⚓", author: "— Franklin D. Roosevelt" },
-  ];
-
-  const quotes = mode === 'art' ? artQuotes : jobQuotes;
-  const [quoteIdx] = useState(() => Math.floor(Math.random() * quotes.length));
-  const quote = quotes[quoteIdx];
+  const [quote, setQuote] = useState<{ text: string; author: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const fetchingRef = useRef(false);
   const accentColor = mode === 'art' ? '#C9A7F4' : '#7FCDBE';
+
+  const fetchQuote = async () => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+    setLoading(true);
+
+    // dummyjson has 1470 quotes (IDs 1–1470); reset seen set when nearly exhausted
+    if (seenQuoteIds.size >= 1400) seenQuoteIds.clear();
+
+    let attempts = 0;
+    while (attempts < 5) {
+      try {
+        const res = await fetch('https://dummyjson.com/quotes/random');
+        const data = await res.json();
+        if (!seenQuoteIds.has(data.id)) {
+          seenQuoteIds.add(data.id);
+          setQuote({ text: data.quote, author: `— ${data.author}` });
+          break;
+        }
+      } catch {
+        break;
+      }
+      attempts++;
+    }
+
+    setLoading(false);
+    fetchingRef.current = false;
+  };
+
+  useEffect(() => { fetchQuote(); }, []);
 
   return (
     <>
-      <p
-        className="text-sm font-semibold leading-relaxed mb-2"
-        style={{ color: accentColor, fontFamily: 'Quicksand, sans-serif' }}
+      {loading ? (
+        <p className="text-xs opacity-30 py-2 animate-pulse" style={{ fontFamily: 'Quicksand', color: accentColor }}>
+          Loading quote…
+        </p>
+      ) : quote ? (
+        <>
+          <p
+            className="text-sm font-semibold leading-relaxed mb-2"
+            style={{ color: accentColor, fontFamily: 'Quicksand, sans-serif' }}
+          >
+            "{quote.text}"
+          </p>
+          <p className="text-xs opacity-50 mb-3" style={{ fontFamily: 'Nunito' }}>{quote.author}</p>
+        </>
+      ) : (
+        <p className="text-xs opacity-30 py-2" style={{ fontFamily: 'Quicksand', color: accentColor }}>
+          Could not load quote
+        </p>
+      )}
+      <button
+        onClick={fetchQuote}
+        disabled={loading}
+        className="text-xs px-3 py-1 rounded-full transition-all hover:opacity-80 active:scale-95 disabled:opacity-30"
+        style={{
+          background: `${accentColor}20`,
+          border: `1px solid ${accentColor}35`,
+          color: accentColor,
+          fontFamily: 'Quicksand, sans-serif',
+        }}
       >
-        "{quote.text}"
-      </p>
-      <p className="text-xs opacity-50" style={{ fontFamily: 'Nunito' }}>{quote.author}</p>
+        {loading ? '…' : '✦ New quote'}
+      </button>
     </>
   );
 }
