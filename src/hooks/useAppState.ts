@@ -56,7 +56,10 @@ export function useAppState() {
   useEffect(() => {
     setSyncStatus('loading');
     fetch(`/api/settings?user_id=${userId.current}`)
-      .then(r => (r.ok ? r.json() : null))
+      .then(r => {
+        if (r.status === 503) { setSyncStatus('idle'); return null; } // D1 not bound — silent
+        return r.ok ? r.json() : null;
+      })
       .then((data: { settings: AppState } | null) => {
         if (data?.settings) {
           skipNextSave.current = true;
@@ -87,6 +90,7 @@ export function useAppState() {
         body: JSON.stringify({ user_id: userId.current, settings: rawState }),
       })
         .then(r => {
+          if (r.status === 503) { setSyncStatus('idle'); return; } // D1 not bound — silent
           if (r.ok) {
             setSyncStatus('saved');
             setTimeout(() => setSyncStatus('idle'), 3000);

@@ -20,6 +20,8 @@ export const onRequestOptions: PagesFunction = () =>
   }));
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
+  if (!env.DB) return cors(new Response(null, { status: 503 }));
+
   const userId = new URL(request.url).searchParams.get('user_id') ?? '';
   if (!UUID_RE.test(userId)) return cors(new Response('Invalid user_id', { status: 400 }));
 
@@ -33,6 +35,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 };
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+  if (!env.DB) return cors(new Response(null, { status: 503 }));
+
   let body: { user_id?: string; settings?: unknown };
   try { body = await request.json(); } catch { return cors(new Response('Bad JSON', { status: 400 })); }
 
