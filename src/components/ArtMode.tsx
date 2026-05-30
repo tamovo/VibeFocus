@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import type { Course, Plant } from '../types';
 
@@ -25,6 +25,7 @@ export default function ArtMode({ courses, onAddCourse, onRemoveCourse, onEarnXP
   const [newSessionTime, setNewSessionTime] = useState('');
   const [justFinished, setJustFinished] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const resultCardRef = useRef<HTMLDivElement | null>(null);
 
   // Clear interval on unmount
   useEffect(() => {
@@ -42,6 +43,7 @@ export default function ArtMode({ courses, onAddCourse, onRemoveCourse, onEarnXP
     setTooFastMsg(false);
     setJustFinished(false);
     if (intervalRef.current) clearInterval(intervalRef.current);
+    setTimeout(() => resultCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
   };
 
   const startTimer = () => {
@@ -161,21 +163,28 @@ export default function ArtMode({ courses, onAddCourse, onRemoveCourse, onEarnXP
         <button
           onClick={selectRandom}
           disabled={courses.length === 0}
-          className="w-full py-3 rounded-2xl font-bold text-white smooth-transition active:scale-95 disabled:opacity-40"
+          className="w-full py-3 rounded-2xl font-bold text-white smooth-transition active:scale-95"
           style={{
-            background: 'linear-gradient(135deg, #F4A7C3, #C9A7F4)',
-            boxShadow: '0 4px 15px rgba(201,167,244,0.4)',
+            background: courses.length === 0 ? 'rgba(201,167,244,0.3)' : 'linear-gradient(135deg, #F4A7C3, #C9A7F4)',
+            boxShadow: courses.length === 0 ? 'none' : '0 4px 15px rgba(201,167,244,0.4)',
             fontFamily: 'Quicksand, sans-serif',
             fontSize: '1rem',
+            cursor: courses.length === 0 ? 'not-allowed' : 'pointer',
           }}
         >
           ✨ What Should I Do?
         </button>
+        {courses.length === 0 && (
+          <p className="text-center text-xs mt-2 opacity-50" style={{ color: '#C9A7F4', fontFamily: 'Nunito' }}>
+            👇 Add a course below to get started!
+          </p>
+        )}
 
         {/* Selected Course Display */}
         {selectedCourse && (
           <div
-            className="mt-4 p-4 rounded-2xl animate-bounce-in"
+            ref={resultCardRef}
+            className="mt-4 p-4 rounded-2xl"
             style={{
               background: 'linear-gradient(135deg, rgba(244,167,195,0.15), rgba(201,167,244,0.15))',
               border: '1px solid rgba(201,167,244,0.3)',

@@ -1,5 +1,14 @@
 export type AppMode = 'art' | 'job';
 
+export interface CharacterCustomization {
+  name: string;
+  hairColor: string;
+  eyeColor: string;
+  skinColor: string;
+  outfitColor: string;
+  accentColor: string;
+}
+
 export interface Course {
   id: string;
   name: string;
@@ -49,6 +58,10 @@ export interface AppState {
   customPlants: Plant[];
   currentTrackIndex: number;
   volume: number;
+  characterCustomization: {
+    art: CharacterCustomization;
+    job: CharacterCustomization;
+  };
 }
 
 export interface RadioTheme {

@@ -9,6 +9,7 @@ import PlantShelf from './components/PlantShelf';
 import CafeShop from './components/CafeShop';
 import LofiPlayer from './components/LofiPlayer';
 import FloatingXP from './components/FloatingXP';
+import CharacterCustomizer from './components/CharacterCustomizer';
 import type { SessionHistory } from './types';
 
 export default function App() {
@@ -26,10 +27,13 @@ export default function App() {
     setTrackIndex,
     setVolume,
     getCafeItems,
+    setCharacterCustomization,
+    syncStatus,
   } = useAppState();
 
   const [activePanel, setActivePanel] = useState<'main' | 'shop' | 'history'>('main');
   const [isSessionActive, setIsSessionActive] = useState(false);
+  const [showCustomizer, setShowCustomizer] = useState(false);
 
   const handleEarnXP = useCallback((amount: number) => {
     addXP(amount);
@@ -109,6 +113,15 @@ export default function App() {
     <div style={bgStyle}>
       <BgBlobs />
 
+      {showCustomizer && (
+        <CharacterCustomizer
+          mode={state.mode}
+          customization={state.characterCustomization[state.mode]}
+          onSave={c => setCharacterCustomization(state.mode, c)}
+          onClose={() => setShowCustomizer(false)}
+        />
+      )}
+
       {/* Confetti canvas */}
       <canvas id="confetti-canvas" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 9999 }} />
 
@@ -138,10 +151,7 @@ export default function App() {
                 <h1
                   className="text-xl font-extrabold leading-tight"
                   style={{
-                    background: `linear-gradient(135deg, ${accentColor2}, ${accentColor})`,
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
+                    color: isArt ? '#7C3F8E' : '#1F6B5C',
                     fontFamily: 'Quicksand, sans-serif',
                   }}
                 >
@@ -153,21 +163,48 @@ export default function App() {
               </div>
             </div>
 
-            {/* XP Badge */}
-            <div
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-              style={{
-                background: `linear-gradient(135deg, ${accentColor2}20, ${accentColor}20)`,
-                border: `1px solid ${accentColor}30`,
-              }}
-            >
-              <span className="text-sm">⭐</span>
+            <div className="flex items-center gap-2">
+              {/* Sync indicator — always visible */}
               <span
-                className="font-bold text-sm"
-                style={{ color: accentColor, fontFamily: 'Quicksand, sans-serif' }}
+                className="text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1"
+                style={{
+                  background:
+                    syncStatus === 'error' ? '#FFE0E0'
+                    : syncStatus === 'saved' ? '#E0FFE8'
+                    : syncStatus === 'idle' ? 'rgba(0,0,0,0.05)'
+                    : `${accentColor}18`,
+                  color:
+                    syncStatus === 'error' ? '#C0392B'
+                    : syncStatus === 'saved' ? '#1E8449'
+                    : syncStatus === 'idle' ? 'rgba(0,0,0,0.3)'
+                    : accentColor,
+                  fontFamily: 'Quicksand, sans-serif',
+                  transition: 'all 0.3s ease',
+                }}
               >
-                {state.xp.toLocaleString()} XP
+                {syncStatus === 'loading' && <span className="animate-spin inline-block">↻</span>}
+                {syncStatus === 'loading' ? ' Syncing…'
+                  : syncStatus === 'saving' ? '↑ Saving…'
+                  : syncStatus === 'saved' ? '✓ Saved'
+                  : syncStatus === 'error' ? '⚠ Sync error'
+                  : '☁ Cloud'}
               </span>
+              {/* XP Badge */}
+              <div
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+                style={{
+                  background: `linear-gradient(135deg, ${accentColor2}20, ${accentColor}20)`,
+                  border: `1px solid ${accentColor}30`,
+                }}
+              >
+                <span className="text-sm">⭐</span>
+                <span
+                  className="font-bold text-sm"
+                  style={{ color: accentColor, fontFamily: 'Quicksand, sans-serif' }}
+                >
+                  {state.xp.toLocaleString()} XP
+                </span>
+              </div>
             </div>
           </div>
 
@@ -183,13 +220,29 @@ export default function App() {
             <div className="space-y-5">
               {/* Avatar */}
               <div
-                className="rounded-3xl p-5 flex flex-col items-center gap-4 soft-shadow"
+                className="rounded-3xl p-5 flex flex-col items-center gap-4 soft-shadow relative"
                 style={{
                   background: isArt ? 'rgba(255,240,250,0.9)' : 'rgba(240,250,248,0.9)',
                   border: `1px solid ${accentColor}25`,
                 }}
               >
-                <Avatar mode={state.mode} isSessionActive={isSessionActive} />
+                <button
+                  onClick={() => setShowCustomizer(true)}
+                  title="Customize character"
+                  className="absolute top-3 right-3 flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all hover:opacity-85 hover:scale-105 active:scale-95"
+                  style={{
+                    background: isArt ? '#C9A7F4' : '#7FCDBE',
+                    color: 'white',
+                    boxShadow: `0 2px 10px ${accentColor}60`,
+                  }}
+                >
+                  ✏️ Edit
+                </button>
+                <Avatar
+                  mode={state.mode}
+                  isSessionActive={isSessionActive}
+                  customization={state.characterCustomization[state.mode]}
+                />
                 <XPBar xp={state.xp} totalXp={state.totalXp} mode={state.mode} />
               </div>
 

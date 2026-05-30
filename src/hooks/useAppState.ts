@@ -1,6 +1,17 @@
+import { useEffect, useRef, useState } from 'react';
 import { useLocalStorage } from './useLocalStorage';
-import type { AppState } from '../types';
+import type { AppState, CharacterCustomization } from '../types';
 import { CAFE_ITEMS } from '../data/cafeItems';
+
+const USER_ID_KEY = 'vibefocus_user_id';
+
+function getOrCreateUserId(): string {
+  let id = localStorage.getItem(USER_ID_KEY);
+  if (!id) { id = crypto.randomUUID(); localStorage.setItem(USER_ID_KEY, id); }
+  return id;
+}
+
+export type SyncStatus = 'idle' | 'loading' | 'saving' | 'saved' | 'error';
 
 const DEFAULT_STATE: AppState = {
   mode: 'art',
@@ -17,10 +28,76 @@ const DEFAULT_STATE: AppState = {
   customPlants: [],
   currentTrackIndex: 0,
   volume: 70,
+  characterCustomization: {
+    art: { name: 'Yuki', hairColor: '#8B4B6B', eyeColor: '#6B21A8', skinColor: '#FFD8C8', outfitColor: '#C9A7F4', accentColor: '#FF69B4' },
+    job: { name: 'Hiro', hairColor: '#4A6B8B', eyeColor: '#1E40AF', skinColor: '#FFD8C8', outfitColor: '#7FB3CD', accentColor: '#FFB3C6' },
+  },
 };
 
 export function useAppState() {
-  const [state, setState] = useLocalStorage<AppState>('vibefocus_state', DEFAULT_STATE);
+  const [rawState, setState] = useLocalStorage<AppState>('vibefocus_state', DEFAULT_STATE);
+
+  // Merge with defaults so newly added fields don't crash on existing stored states
+  const state: AppState = {
+    ...DEFAULT_STATE,
+    ...rawState,
+    characterCustomization: {
+      ...DEFAULT_STATE.characterCustomization,
+      ...rawState.characterCustomization,
+    },
+  };
+
+  const userId = useRef(getOrCreateUserId());
+  const skipNextSave = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
+
+  // Load from D1 on mount
+  useEffect(() => {
+    setSyncStatus('loading');
+    fetch(`/api/settings?user_id=${userId.current}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then((data: { settings: AppState } | null) => {
+        if (data?.settings) {
+          skipNextSave.current = true;
+          setState({
+            ...DEFAULT_STATE,
+            ...data.settings,
+            characterCustomization: {
+              ...DEFAULT_STATE.characterCustomization,
+              ...data.settings.characterCustomization,
+            },
+          });
+        }
+        setSyncStatus('idle');
+      })
+      .catch(() => setSyncStatus('idle'));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Save to D1 (debounced 2s, skips the setState triggered by the load above)
+  useEffect(() => {
+    if (skipNextSave.current) { skipNextSave.current = false; return; }
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      setSyncStatus('saving');
+      fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId.current, settings: rawState }),
+      })
+        .then(r => {
+          if (r.ok) {
+            setSyncStatus('saved');
+            setTimeout(() => setSyncStatus('idle'), 3000);
+          } else {
+            setSyncStatus('error');
+          }
+        })
+        .catch(() => setSyncStatus('error'));
+    }, 2000);
+    return () => clearTimeout(saveTimer.current);
+  }, [rawState]);
 
   const addXP = (amount: number) => {
     setState(prev => ({
@@ -89,6 +166,13 @@ export function useAppState() {
     setState(prev => ({ ...prev, volume }));
   };
 
+  const setCharacterCustomization = (mode: AppState['mode'], customization: CharacterCustomization) => {
+    setState(prev => ({
+      ...prev,
+      characterCustomization: { ...prev.characterCustomization, [mode]: customization },
+    }));
+  };
+
   // Get all cafe items merged with unlock state
   const getCafeItems = () => {
     return CAFE_ITEMS.map(item => ({
@@ -111,5 +195,8 @@ export function useAppState() {
     setTrackIndex,
     setVolume,
     getCafeItems,
+    setCharacterCustomization,
+    syncStatus,
+    userId: userId.current,
   };
 }

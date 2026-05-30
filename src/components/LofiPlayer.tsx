@@ -39,7 +39,18 @@ export default function LofiPlayer({
     const onPlaying = () => { setIsLoading(false); setIsPlaying(true); setHasError(false); };
     const onWaiting = () => setIsLoading(true);
     const onCanPlay = () => setIsLoading(false);
-    const onError = () => { setIsLoading(false); setHasError(true); setIsPlaying(false); };
+    const onError = () => {
+      // Try ice2 mirror automatically before giving up
+      const src = audio.src;
+      if (src && src.includes('ice1.') && !src.includes('ice2.')) {
+        audio.src = src.replace('ice1.', 'ice2.');
+        audio.play().catch(() => { setIsLoading(false); setHasError(true); setIsPlaying(false); });
+      } else {
+        setIsLoading(false);
+        setHasError(true);
+        setIsPlaying(false);
+      }
+    };
     const onPause = () => setIsPlaying(false);
 
     audio.addEventListener('playing', onPlaying);
@@ -85,19 +96,25 @@ export default function LofiPlayer({
     return () => { if (barIntervalRef.current) clearInterval(barIntervalRef.current); };
   }, [isPlaying]);
 
-  const startStream = async (url: string) => {
+  const startStream = async (url: string, isMirror = false) => {
     const audio = audioRef.current;
     if (!audio) return;
     setHasError(false);
     setIsLoading(true);
     audio.src = url;
-    audio.volume = volume / 100;
+    // Guard: ensure volume is audible (at least 10%) when starting
+    audio.volume = Math.max(volume, 10) / 100;
     try {
       await audio.play();
     } catch {
-      setHasError(true);
-      setIsLoading(false);
-      setIsPlaying(false);
+      // On first failure, auto-retry with the ice2 mirror once
+      if (!isMirror && url.includes('ice1.')) {
+        startStream(url.replace('ice1.', 'ice2.'), true);
+      } else {
+        setHasError(true);
+        setIsLoading(false);
+        setIsPlaying(false);
+      }
     }
   };
 
@@ -173,6 +190,17 @@ export default function LofiPlayer({
             {isLoading ? '⏳ Buffering…' : hasError ? '⚠️ Stream error' : isPlaying ? `♾ Live · ${theme.mood}` : theme.description}
           </p>
         </div>
+
+        {/* Retry button (only shown on error) */}
+        {hasError && (
+          <button
+            onClick={e => { e.stopPropagation(); retryStream(); }}
+            className="px-2.5 py-1 rounded-full text-xs font-bold flex-shrink-0 smooth-transition active:scale-95"
+            style={{ background: `${accentColor}25`, color: accentColor }}
+          >
+            Retry
+          </button>
+        )}
 
         {/* Play / Pause */}
         <button

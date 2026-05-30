@@ -1,0 +1,8 @@
+name = "vibefocus"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "vibefocus-db"
+database_id = "e2f79f9b-78c9-42f9-a357-eb92969dfd00"
