@@ -2,8 +2,9 @@ name = "vibefocus"
 compatibility_date = "2024-09-23"
 pages_build_output_dir = "dist"
 
-[vars]
-GOOGLE_CLIENT_ID = "405476178589-e7p4cukq65amt9g2i96qli7uih6meola.apps.googleusercontent.com"
+# Environment variables are set in Cloudflare Pages dashboard → Settings → Environment variables:
+#   GOOGLE_CLIENT_ID      — used by Pages Functions (server-side token verification)
+#   VITE_GOOGLE_CLIENT_ID — used by Vite at build time (Google OAuth button)
 
 [[d1_databases]]
 binding = "DB"
